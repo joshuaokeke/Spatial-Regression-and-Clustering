@@ -1,0 +1,475 @@
+---
+title: "*Spatial Statistics Lab 8*"
+author: '**Onyedikachi J Okeke**'
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **0.0 To Load the library**
+```{r,comment="",echo=TRUE,eval=FALSE}
+library(sp)
+library(spatstat)
+library(sf)
+library(spatstat.geom)
+library(ctv)
+library(terra)
+library(spdep)
+library(rgdal)
+library(rgdal)
+library(terra)
+library(RColorBrewer)
+library(classInt)
+library(epitools)
+library(DCluster)
+library(lmtest)
+library(car)
+library(spatialreg)
+library(spdep)
+library(classInt)
+library(spgwr)
+library(ggplot2)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+library(sp)
+library(spatstat)
+library(sf)
+library(spatstat.geom)
+library(ctv)
+library(terra)
+library(spdep)
+library(rgdal)
+library(rgdal)
+library(terra)
+library(RColorBrewer)
+library(classInt)
+library(epitools)
+library(DCluster)
+library(lmtest)
+library(car)
+library(spatialreg)
+library(spdep)
+library(classInt)
+library(spgwr)
+library(ggplot2)
+
+```
+
+### **0.1 Loading Boston data**
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+Boston <- readOGR(system.file("shapes/boston_tracts.shp", package="spData")[1])
+class(Boston)
+plot(Boston)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+Boston <- readOGR(system.file("shapes/boston_tracts.shp", package="spData")[1])
+class(Boston)
+plot(Boston)
+
+```
+
+## **Part One**
+
+### **0.1 Row-standardized data and OLS for Housing**
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+# creates a row-standardized "listw" object (default style = "W")
+Boston_queen_nb <- poly2nb(Boston, queen=TRUE)
+Boston_w <- nb2listw(Boston_queen_nb)
+
+# creates a non row-standardized "listw" object
+Boston_b <- nb2listw(Boston_queen_nb,style="B")
+
+# displays the "data.frame" attribute of the shape file
+
+boston_data <- attr(Boston, "data")
+# Extracting the first 10 rows
+first_5 <- head(boston_data, 5)
+# Extracting the last 10 rows
+last_5 <- tail(boston_data, 5)
+# Combining the first 10 and last 10 rows
+combined_rows <- rbind(first_5, last_5)
+
+# Display the combined rows
+print(combined_rows)
+
+# using log of median housing value instead of housing value
+Boston$LOGMEDV<-log(Boston$CMEDV)
+
+# OLS for housing value
+Boston_OLS <- lm(LOGMEDV~CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, data=Boston)
+summary(Boston_OLS)
+# saving residuals and fitted values
+Boston$olsresid<-residuals(Boston_OLS)
+Boston$ols_fitted <- fitted(Boston_OLS)
+# Moran test for residuals
+lm.morantest(Boston_OLS, Boston_w)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+# creates a row-standardized "listw" object (default style = "W")
+Boston_queen_nb <- poly2nb(Boston, queen=TRUE)
+Boston_w <- nb2listw(Boston_queen_nb)
+
+# creates a non row-standardized "listw" object
+Boston_b <- nb2listw(Boston_queen_nb,style="B")
+
+# displays the "data.frame" attribute of the shape file
+
+boston_data <- attr(Boston, "data")
+# Extracting the first 10 rows
+first_10 <- head(boston_data, 10)
+# Extracting the last 10 rows
+last_10 <- tail(boston_data, 10)
+# Combining the first 10 and last 10 rows
+combined_rows <- rbind(first_10, last_10)
+
+# Display the combined rows
+print(combined_rows)
+
+# using log of median housing value instead of housing value
+Boston$LOGMEDV<-log(Boston$CMEDV)
+
+# OLS for housing value
+Boston_OLS <- lm(LOGMEDV~CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, data=Boston)
+summary(Boston_OLS)
+# saving residuals and fitted values
+Boston$olsresid<-residuals(Boston_OLS)
+Boston$ols_fitted <- fitted(Boston_OLS)
+# Moran test for residuals
+lm.morantest(Boston_OLS, Boston_w)
+
+```
+
+Q1. Describe the OLS regression model results and their significance.
+
+### **Lagrange multiplier tests for residuals**
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+lm.LMtests(Boston_OLS, Boston_w, test="all")
+#Breusch Pagan test for heteroskedasticity
+bptest(Boston_OLS)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+lm.LMtests(Boston_OLS, Boston_w, test="all")
+#Breusch Pagan test for heteroskedasticity
+bptest(Boston_OLS)
+
+```
+
+Q2. Describe the diagnostics test results for spatial autocorrelation.
+
+### **Spatial lag Regression**
+
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+Boston_spatial_lag <- lagsarlm(LOGMEDV ~ CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, data=Boston, Boston_w)
+summary(Boston_spatial_lag)
+# saving residuals and fitted values
+Boston$lagresid<-residuals(Boston_spatial_lag)
+Boston$lag_fitted <- fitted(Boston_spatial_lag)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+Boston_spatial_lag <- lagsarlm(LOGMEDV ~ CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, data=Boston, Boston_w)
+summary(Boston_spatial_lag)
+# saving residuals and fitted values
+Boston$lagresid<-residuals(Boston_spatial_lag)
+Boston$lag_fitted <- fitted(Boston_spatial_lag)
+
+```
+
+Q3. Describe the spatial lag regression model results and its significance.
+
+### **Error regression** 
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+Boston_spatial_error <- errorsarlm(LOGMEDV ~ CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, data=Boston, Boston_w)
+summary(Boston_spatial_error)
+# saving residuals and fitted values
+Boston$error_resid<-residuals(Boston_spatial_error)
+Boston$error_fitted <- fitted(Boston_spatial_error)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+Boston_spatial_error <- errorsarlm(LOGMEDV ~ CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, data=Boston, Boston_w)
+summary(Boston_spatial_error)
+# saving residuals and fitted values
+Boston$error_resid<-residuals(Boston_spatial_error)
+Boston$error_fitted <- fitted(Boston_spatial_error)
+
+```
+
+Q4. Describe the spatial error regression model results and its significance.
+
+## **Part Two**
+### **create a data frame** 
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+# create a data frame
+boston.df <- data.frame(Boston)
+names(boston.df) # gives us the column names
+colnames(boston.df) # alternative call; same thing
+
+attach(boston.df) #Now you can call the variable name without using “$”
+
+LOGCMEDV <- log(CMEDV)
+
+# we create this location using the coordinates of the centroids:
+XYgridtable <- cbind(LON, LAT)
+#using gwr.sel to find optimal parameters
+adaptive.bw<-gwr.sel(LOGCMEDV~CRIM+CHAS+NOX+RM+AGE+DIS+B+LSTAT,adapt=TRUE, method="cv", coords=XYgridtable)
+###gwr.Gauss() default
+
+#number of observations (polygon)
+dim(boston.df)[1]
+# how many points does each window take
+print(dim(boston.df)[1]*adaptive.bw )
+#run gwr using the optimal parameter found above
+bos.gwr<-gwr(LOGCMEDV ~ CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, adapt = adaptive.bw, gweight = gwr.Gauss, hatmatrix = TRUE, coords = XYgridtable)
+print(bos.gwr)
+#Plot local R2
+classes_fx <- classIntervals(bos.gwr$SDF$localR2, n=5, style="quantile")
+cols <- findColours(classes_fx,pal)
+pal <- brewer.pal(5, "YlOrRd")
+plot(Boston,col=cols, border="grey")
+legend(x="topleft", cex=0.65, fill=attr(cols,"palette"), bty="n", legend=names(attr(cols, "table")), title="Local R^2",ncol=1)
+#Plot Residual
+res <- bos.gwr$SDF$gwr.e
+classes_fx <- classIntervals(res, n=5, style="quantile")
+pal <- brewer.pal(5, "YlOrRd")
+cols <- findColours(classes_fx,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.65, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Residual", ncol=1)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=6, fig.height=4}
+
+# create a data frame
+boston.df <- data.frame(Boston)
+names(boston.df) # gives us the column names
+colnames(boston.df) # alternative call; same thing
+attach(boston.df) #Now you can call the variable name without using “$”
+LOGCMEDV <- log(CMEDV)
+
+# we create this location using the coordinates of the centroids:
+XYgridtable <- cbind(LON, LAT)
+#using gwr.sel to find optimal parameters
+adaptive.bw<-gwr.sel(LOGCMEDV~CRIM+CHAS+NOX+RM+AGE+DIS+B+LSTAT,adapt=TRUE, method="cv", coords=XYgridtable)
+###gwr.Gauss() default
+
+#number of observations (polygon)
+dim(boston.df)[1]
+# how many points does each window take
+print(dim(boston.df)[1]*adaptive.bw )
+#run gwr using the optimal parameter found above
+bos.gwr<-gwr(LOGCMEDV ~ CRIM + CHAS + NOX + RM + AGE + DIS + B + LSTAT, adapt = adaptive.bw, gweight = gwr.Gauss, hatmatrix = TRUE, coords = XYgridtable)
+
+print(bos.gwr)
+#Plot local R2
+classes_fx <- classIntervals(bos.gwr$SDF$localR2, n=5, style="quantile")
+
+pal <- brewer.pal(5, "YlOrRd")
+
+cols <- findColours(classes_fx,pal)
+
+plot(Boston,col=cols, border="grey")
+legend(x="topleft", cex=0.65, fill=attr(cols,"palette"), bty="n", legend=names(attr(cols, "table")), title="Local R^2",ncol=1)
+#Plot Residual
+res <- bos.gwr$SDF$gwr.e
+classes_fx <- classIntervals(res, n=5, style="quantile")
+pal <- brewer.pal(5, "YlOrRd")
+cols <- findColours(classes_fx,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.65, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Residual", ncol=1)
+
+```
+
+Q5. Take screenshots of the plots and describe the pattern of local R2 and residual.
+
+### **Spatial lag Regression**
+
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+###plot local coefficient (CRIM)
+coef <- bos.gwr$SDF$CRIM
+classes_fx <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.75, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title = "Local Coefficient Estimates (CRIM)", ncol=1)
+
+###plot local coefficient (NOX)
+coef <- bos.gwr$SDF$NOX
+classes_fx2 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx2,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (NOX)", ncol = 1)
+
+#Plot RM, AGE, DIS, B, LSTAT
+
+###plot local coefficient (RM)
+coef <- bos.gwr$SDF$RM
+classes_fx4 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx4,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (RM)", ncol = 1)
+
+###plot local coefficient (AGE)
+coef <- bos.gwr$SDF$AGE
+classes_fx5 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx5,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (AGE)", ncol = 1)
+
+
+###plot local coefficient (DIS)
+coef <- bos.gwr$SDF$DIS
+classes_fx6 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx6,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (DIS)", ncol = 1)
+
+
+###plot local coefficient (B)
+coef <- bos.gwr$SDF$B
+classes_fx7 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx7,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (B)", ncol = 1)
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=8, fig.height=5}
+
+###plot local coefficient (CRIM)
+coef <- bos.gwr$SDF$CRIM
+classes_fx <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.75, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title = "Local Coefficient Estimates (CRIM)", ncol=1)
+
+###plot local coefficient (NOX)
+coef <- bos.gwr$SDF$NOX
+classes_fx2 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx2,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (NOX)", ncol = 1)
+
+#Plot RM, AGE, DIS, B, LSTAT
+
+###plot local coefficient (RM)
+coef <- bos.gwr$SDF$RM
+classes_fx4 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx4,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (RM)", ncol = 1)
+
+###plot local coefficient (AGE)
+coef <- bos.gwr$SDF$AGE
+classes_fx5 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx5,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (AGE)", ncol = 1)
+
+
+###plot local coefficient (DIS)
+coef <- bos.gwr$SDF$DIS
+classes_fx6 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx6,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (DIS)", ncol = 1)
+
+
+###plot local coefficient (B)
+coef <- bos.gwr$SDF$B
+classes_fx7 <- classIntervals(coef, n=5, style="quantile")
+cols <- findColours(classes_fx7,pal)
+plot(Boston,col=cols, border="transparent")
+legend(x="topleft", cex=0.7, fill=attr(cols, "palette"), bty="n", legend=names(attr(cols, "table")), title="Local Coefficient Estimates (B)", ncol = 1)
+
+```
+
+### **plot t values (CRIME)** 
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+#plot t values (CRIME)
+bos.gwr$SDF$CRIM_t <- bos.gwr$SDF$CRIM/bos.gwr$SDF$CRIM_se
+tCRIM<-bos.gwr$SDF$CRIM_t
+display.brewer.pal(3, "RdBu")
+colors <- brewer.pal(3, "RdBu") # Stores colors in object color
+color.category.reg <- findInterval(tCRIM,
+c(min(tCRIM)-.0001, -1.96, -1.64,
+max(tCRIM)+.0001),all.inside=TRUE)
+#classes_fx <- classIntervals(tCRIM, n=5, style="quantile")
+#cols <- findColours(classes_fx,pal)
+plot(Boston,col=colors[color.category.reg], border="transparent")
+labels <- c("<-1.96", " -1.96 to -1.64", "Not significant")
+legend("bottom", legend=labels, fill=colors, cex=0.8,
+y.intersp = 0.99, bty="n")
+
+```
+##### Result
+```{r echo=FALSE, results='show', fig.show='hold', eval=TRUE, warning=FALSE, fig.width=8, fig.height=5}
+
+library(ggplot2)
+
+#plot t values (CRIME)
+bos.gwr$SDF$CRIM_t <- bos.gwr$SDF$CRIM/bos.gwr$SDF$CRIM_se
+tCRIM<-bos.gwr$SDF$CRIM_t
+display.brewer.pal(3, "RdBu")
+colors <- brewer.pal(3, "RdBu") # Stores colors in object color
+color.category.reg <- findInterval(tCRIM,
+c(min(tCRIM)-.0001, -1.96, -1.64,
+max(tCRIM)+.0001),all.inside=TRUE)
+
+#classes_fx <- classIntervals(tCRIM, n=5, style="quantile")
+#cols <- findColours(classes_fx,pal)
+plot(Boston,col=colors[color.category.reg], border="transparent")
+labels <- c("<-1.96", " -1.96 to -1.64", "Not significant")
+legend("bottom", legend=labels, fill=colors, cex=0.8,
+y.intersp = 0.99, bty="n")
+
+
+# Plot the t-values using spplot
+spplot(bos.gwr$SDF, "CRIM_t", main="t-values for CRIM Coefficients",
+       col.regions=colorRampPalette(c("blue", "white", "red"))(100))
+
+# Generate summary for the GWR model
+bos.gwr.summary <- summary(bos.gwr, verbose = TRUE)  # the verbose = TRUE might provide more info
+
+# Look at the structure of the summary to find coefficients and standard errors
+str(bos.gwr.summary)
+
+
+```
+
+
+
+
+
+Q7. Take a screen shot of the plot and describe the pattern. (10 points)
+Q8. Describe the GWR model results and their significance. How does it compare with the regression results in part 1? (10 points)
+Q9. How could you use these results as a policymaker who is interested in environmental or social issues (pollution or affordable housing)?
